@@ -1,6 +1,7 @@
 // mod dbConnect;
 
 use std::num::ParseIntError;
+use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Offset, ParseResult, Utc};
 use chrono_tz::ParseError;
 use clap::{Arg, Command};
@@ -8,6 +9,9 @@ use clap::builder::Str;
 use dialoguer::Input;
 use log::debug;
 
+fn is_valid_format(time_str: &str, format: &str) -> bool {
+    NaiveDateTime::parse_from_str(time_str, format).is_ok()
+}
 
 fn get_system_timezone_as_fixedoffset() -> FixedOffset {
     // 获取当前系统本地时间
@@ -29,20 +33,9 @@ fn calculate_fixed_offset_difference(offsetTz: FixedOffset) -> FixedOffset {
 }
 
 fn convert_to_utc(time_str: &str, format_str: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
-
-    // let naive_date_time = NaiveDateTime::parse_from_str(time_str, format_str)?;
-
-    match NaiveDateTime::parse_from_str(time_str, format_str) {
-        Ok(_naive_date_time) => {
-            // 将无时区的 NaiveDateTime 转换为 UTC 时区的 DateTime
-            Ok(DateTime::from_naive_utc_and_offset(_naive_date_time, Utc))
-        }
-        Err(e) => {
-            panic!("会议时间格式不正确：{:?}", e)
-        }
-    }
-
-
+    let naive_date_time = NaiveDateTime::parse_from_str(time_str, format_str)?;
+    // 将无时区的 NaiveDateTime 转换为 UTC 时区的 DateTime
+    Ok(DateTime::from_naive_utc_and_offset(naive_date_time, Utc))
 }
 
 fn parse_offset(hours: i32) -> Result<FixedOffset, String> {
@@ -52,11 +45,11 @@ fn parse_offset(hours: i32) -> Result<FixedOffset, String> {
 
 fn parse_offset_str(timezone: &str) -> Result<FixedOffset, String> {
     let hours_str = &timezone[3..];
-    let sign = if hours_str.starts_with('+') { 1 } else { -1 };
+    // let sign = if hours_str.starts_with('+') { 1 } else { -1 };
 
     match timezone[3..].parse::<i32>() {
         Ok(hours) => {
-            FixedOffset::east_opt(sign * 3600 * hours)
+            FixedOffset::east_opt(3600 * hours)
                 .ok_or_else(|| format!("Invalid timezone offset: {}", timezone))
         }
         Err(e) => Err(e.to_string()), // Directly forward the ParseIntError as a String
@@ -96,6 +89,10 @@ fn convert_meeting_timezone(
 }
 
 fn main() {
+
+    // 日期格式要求 YYYY-MM-DD HH:MM
+    let format = "%Y-%m-%d %H:%M";
+
     let matches = Command::new("时区转换工具CLI")
         .version("1.0")
         .author("Ethan.Yin <ethan.yin@jetbrains.com>")
@@ -107,10 +104,20 @@ fn main() {
         .get_matches();
 
     let meetingDateTime: String = Input::new()
-        .with_prompt("请输入你时区的会议时间，以 'YYYY-MM-DD HH:MM' 的格式.")
+        .with_prompt("请输入你时区的会议时间，以 'YYYY-MM-DD HH:MM' 的格式")
         .interact_text()
         .unwrap();
 
+    // 检查输入的日期是否正确
+    match is_valid_format(meetingDateTime.as_str(), format) {
+        true => {}
+
+        false => {
+            panic!("日期格式不正确：{} -> YYYY-MM-DD HH:MM", meetingDateTime);
+        }
+    }
+
+    // 输入目标时区
     let targetTimezone: String = Input::new()
         .with_prompt("转换目标时区(UTC)?(UTC+2)")
         .default("UTC+2".to_string())
@@ -122,9 +129,4 @@ fn main() {
     let rst_dt: DateTime<FixedOffset> = convert_meeting_timezone(&meetingDateTime, &targetTimezone);
 
     println!("转换后的会议时间: {}", rst_dt);
-
-    // match convert_meeting_timezone(&meetingDateTime, &targetTimezone) {
-    //     Ok(converted_time) => println!("转换后的会议时间: {}", converted_time),
-    //     Err(e) => eprintln!("解析错误: {}", e),
-    // }
 }
