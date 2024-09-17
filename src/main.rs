@@ -1,13 +1,13 @@
 // mod dbConnect;
 
-use std::num::ParseIntError;
-use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Offset, ParseResult, Utc};
 use chrono_tz::ParseError;
-use clap::{Arg, Command};
 use clap::builder::Str;
+use clap::{Arg, Command};
 use dialoguer::Input;
 use log::debug;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 fn is_valid_format(time_str: &str, format: &str) -> bool {
     NaiveDateTime::parse_from_str(time_str, format).is_ok()
@@ -45,11 +45,11 @@ fn parse_offset(hours: i32) -> Result<FixedOffset, String> {
 
 fn parse_offset_str(timezone: &str) -> Result<FixedOffset, String> {
     let hours_str = &timezone[3..];
-    // let sign = if hours_str.starts_with('+') { 1 } else { -1 };
+    let sign = if hours_str.starts_with('+') { 1 } else { -1 };
 
     match timezone[3..].parse::<i32>() {
         Ok(hours) => {
-            FixedOffset::east_opt(3600 * hours)
+            FixedOffset::east_opt(sign * 3600 * hours)
                 .ok_or_else(|| format!("Invalid timezone offset: {}", timezone))
         }
         Err(e) => Err(e.to_string()), // Directly forward the ParseIntError as a String
